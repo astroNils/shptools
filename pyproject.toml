@@ -1,0 +1,31 @@
+[build-system]
+requires = ["affine>=2.4.0",
+            "geopandas>=0.13.2",
+            "numpy>=1.25.0",
+            "pandas>=2.0.2",
+            "pycocotools>=2.0.6",
+            "rasterio>=1.3.7",
+            "Shapely>=2.0.1",
+            "scikit-image>=0.21.0",
+            "tqdm>=4.65.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "shptools_BOULDERING"
+version = "0.0.3"
+license = {file = "LICENSE.txt"}
+authors = [
+  { name="Nils C. Prieur", email="prieur.nils@gmail.com" },
+]
+description = "Shptools is a package that gathers a collection of tools to manipulate shapefiles."
+readme = "README.md"
+requires-python = ">=3.9"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/yellowchocobo/shptools"
+"Bug Tracker" = "https://github.com/yellowchocobo/shptools/issues"

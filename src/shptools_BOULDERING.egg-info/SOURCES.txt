@@ -1,0 +1,14 @@
+LICENSE.txt
+README.md
+pyproject.toml
+src/shptools_BOULDERING/__init__.py
+src/shptools_BOULDERING/annotations.py
+src/shptools_BOULDERING/geometry.py
+src/shptools_BOULDERING/geomorph.py
+src/shptools_BOULDERING/metrics.py
+src/shptools_BOULDERING/misc.py
+src/shptools_BOULDERING/shp.py
+src/shptools_BOULDERING.egg-info/PKG-INFO
+src/shptools_BOULDERING.egg-info/SOURCES.txt
+src/shptools_BOULDERING.egg-info/dependency_links.txt
+src/shptools_BOULDERING.egg-info/top_level.txt
