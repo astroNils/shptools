@@ -8,14 +8,14 @@ This GitHub repository is written following the functional programming paradigm.
 
 ## To do
 
-- [ ] Add multi-ring function.
+- [x] Add multi-ring function.
 
 ## Installation
 
 Create a new environment if wanted. Then you can install the rastertools by writing the following in your terminal. 
 
 ```bash
-git clone https://github.com/yellowchocobo/shptools.git
+git clone https://github.com/astroNils/shptools.git
 cd shptools
 python3 -m pip install --index-url https://test.pypi.org/simple/ --no-deps shptools_BOULDERING
 pip install -r requirements.txt
