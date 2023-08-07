@@ -20,6 +20,48 @@ def buffer(in_shp, buffer_dist, out_shp):
     gdf_buffer.to_file(out_shp)
     return (gdf_buffer)
 
+def multi_ring_buffer(in_shp, buffer_dist, number_of_rings, out_shp):
+    gdf = gpd.read_file(in_shp)
+    gdf_buffer = gdf.copy()
+    geoms = []
+    for n in range(number_of_rings + 1):
+        buffer_dist_tmp = (n) * buffer_dist
+        geoms.append(gdf_buffer.geometry.buffer(buffer_dist_tmp).values[0])
+
+    d = {'ringid': list(np.arange(number_of_rings + 1)), 'distance': np.arange(0,buffer_dist * (number_of_rings+1), buffer_dist),
+         'geometry': geoms}
+    gdf_multi_ring = gpd.GeoDataFrame(d, crs=gdf_buffer.crs)
+    gdf_multi_ring.to_file(out_shp)
+    return(gdf_multi_ring)
+
+
+def multi_ring_donut(in_shp, buffer_dist, number_of_rings, out_shp):
+    gdf = gpd.read_file(in_shp)
+    gdf_buffer = gdf.copy()
+    geoms = []
+    for n in range(number_of_rings + 1):
+        buffer_dist_tmp = (n) * buffer_dist
+        geoms.append(gdf_buffer.geometry.buffer(buffer_dist_tmp).values[0])
+
+    d = {'ringid': list(np.arange(number_of_rings + 1)),
+         'distance': np.arange(0, buffer_dist * (number_of_rings + 1), buffer_dist),
+         'geometry': geoms}
+    gdf_multi_ring = gpd.GeoDataFrame(d, crs=gdf_buffer.crs)
+
+    geoms = []
+
+    for n in range(number_of_rings):
+        geoms.append(gdf_multi_ring.iloc[n + 1].geometry.difference(gdf_multi_ring.iloc[n].geometry))
+
+    distance = np.arange(0, buffer_dist * (number_of_rings + 1), buffer_dist)
+    d = {'ringid': list(np.arange(number_of_rings)), 'distance_start': distance[:-1],
+         'distance_end': distance[1:],
+         'geometry': geoms}
+
+    gdf_multi_donut_ring = gpd.GeoDataFrame(d, crs=gdf_buffer.crs)
+    gdf_multi_donut_ring.to_file(out_shp)
+    return (gdf_multi_donut_ring)
+
 def centroid(in_shp, out_shp):
     gdf = gpd.read_file(in_shp)
     gdf_centroids = gdf.copy()
@@ -106,7 +148,10 @@ def intersect(in_shp, mask_shp, min_area_threshold, out_shp):
 
     # in order to get the intersection without clipping, we use the index and the original dataframe
     gdf_clip = gpd.overlay(gdf, gdf_mask, how='intersection', keep_geom_type=True, make_valid=True)
-    gdf_intersect = gdf[gdf["id"].isin(gdf_clip["id"])]
+    try:
+        gdf_intersect = gdf[gdf["id"].isin(gdf_clip["id"])]
+    except:
+        gdf_intersect = gdf[gdf["id_1"].isin(gdf_clip["id"])] # in case there is an id column in both
     gdf_intersect["area"] = gdf_intersect.geometry.area
     gdf_intersect = gdf_intersect[gdf_intersect["area"] >= min_area_threshold]
     gdf_intersect["id"] = np.arange(gdf_intersect.shape[0]).astype('int')
@@ -228,3 +273,4 @@ def shift_between(in_shp1, in_shp2):
     gdf2["shift_y"] = shifts_y
 
     return (gdf1, gdf2)
+

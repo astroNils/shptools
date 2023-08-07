@@ -1,7 +1,17 @@
+import geopandas as gpd
+import numpy as np
+import pandas as pd
+import torch
+import torchvision
+from rastertools_BOULDERING import raster, metadata as raster_metadata
+
+#TODO: improve functions (e.g., when there are no boulders within size range).
 def batch_calculate_iou(ground_truth, predictions, in_raster, area,
                         iou_threshold):
     """
-    area needs to be tuple (min_area, max_area)
+    Currently used.
+
+    Area needs to be tuple (min_area, max_area)
     In number of pixels/area
 
     small : (6*6, 12*12)
@@ -12,7 +22,7 @@ def batch_calculate_iou(ground_truth, predictions, in_raster, area,
     """
 
     # raster resolution
-    res = raster.get_raster_resolution(in_raster)[0]
+    res = raster_metadata.get_resolution(in_raster)[0]
 
     # loading of the data
     gdf_gt = gpd.read_file(ground_truth)
@@ -118,6 +128,9 @@ def format_iou_to_pd(areas, iou_thresholds, precisions, recalls, f1_scores,
         dfs.append(df)
 
     return (dfs)
+
+'''
+## OUTDATED: To be deleted...
 
 def process_iou(ground_truth, predictions):
     gdf_gt = gpd.read_file(ground_truth)
@@ -314,3 +327,5 @@ def calculate_iou(boulder_polygon_mapped, boulder_polygon_inferred, res):
         gdf_inferred_fp.to_file(filename_fp)
 
     return (ious)
+
+'''
