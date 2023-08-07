@@ -12,7 +12,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "shptools_BOULDERING"
-version = "0.0.3"
+version = "0.0.4"
 license = {file = "LICENSE.txt"}
 authors = [
   { name="Nils C. Prieur", email="prieur.nils@gmail.com" },
@@ -27,5 +27,5 @@ classifiers = [
 ]
 
 [project.urls]
-"Homepage" = "https://github.com/yellowchocobo/shptools"
-"Bug Tracker" = "https://github.com/yellowchocobo/shptools/issues"
+"Homepage" = "https://github.com/astroNils/shptools"
+"Bug Tracker" = "https://github.com/astroNils/shptools/issues"
