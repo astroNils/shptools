@@ -8,7 +8,7 @@ This GitHub repository is written following the functional programming paradigm.
 
 ## To do
 
-- [x] Add multi-ring function.
+- [x] Add multi-ring function..
 
 ## Installation
 
