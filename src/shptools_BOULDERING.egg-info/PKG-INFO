@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: shptools-BOULDERING
-Version: 0.0.3
+Version: 0.0.4
 Summary: Shptools is a package that gathers a collection of tools to manipulate shapefiles.
 Author-email: "Nils C. Prieur" <prieur.nils@gmail.com>
 License: MIT License
@@ -25,8 +25,8 @@ License: MIT License
         OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
         SOFTWARE.
         
-Project-URL: Homepage, https://github.com/yellowchocobo/shptools
-Project-URL: Bug Tracker, https://github.com/yellowchocobo/shptools/issues
+Project-URL: Homepage, https://github.com/astroNils/shptools
+Project-URL: Bug Tracker, https://github.com/astroNils/shptools/issues
 Classifier: Programming Language :: Python :: 3
 Classifier: License :: OSI Approved :: MIT License
 Classifier: Operating System :: OS Independent
@@ -34,29 +34,26 @@ Requires-Python: >=3.9
 Description-Content-Type: text/markdown
 License-File: LICENSE.txt
 
-# rastertools_BOULDERING
+# shptools_BOULDERING
 
-(last updated the 19th of June 2023).
+(last updated the 20th of July 2023).
 
-Rastertools is a package that gathers a collection of tools to manipulate rasters and extract metadata from them. A large portion of this package was written for  the pre- and post-processing of planetary images so that it can be easily ingested in deep learning algorithms. Because of that, some of the functions are a bit, sometimes, too specific and repetitive (sorry for that!). I will try over time to improve this GitHub repository. Please contribute if you are interested. 
+Shptools is a package that gathers a collection of tools to manipulate shapefiles. A large portion of this package was written for  the pre- and post-processing of planetary images so that it can be easily ingested in deep learning algorithms. Because of that, some of the functions are a bit, sometimes, too specific and repetitive (sorry for that!). I will try over time to improve this GitHub repository. Please contribute if you are interested. 
 
 This GitHub repository is written following the functional programming paradigm. 
 
 ## To do
 
-- [ ] Define coordinate systems (in `crs.py`) with different lonlat range (-180, 180) and (0, 360). Right now, there are some issues due to this problem. 
-- [ ] `raster.projection` is currently not working for projection from Equirectangular to Moon2000. 
-- [ ] Clean functions in `convert.py`.
-- [ ] Global cleaning of the documentation of functions.
+- [x] Add multi-ring function..
 
 ## Installation
 
 Create a new environment if wanted. Then you can install the rastertools by writing the following in your terminal. 
 
 ```bash
-git clone https://github.com/yellowchocobo/rastertools.git
-cd rastertools
-python3 -m pip install --index-url https://test.pypi.org/simple/ --no-deps rastertools_BOULDERING
+git clone https://github.com/astroNils/shptools.git
+cd shptools
+python3 -m pip install --index-url https://test.pypi.org/simple/ --no-deps shptools_BOULDERING
 pip install -r requirements.txt
 ```
 
@@ -67,10 +64,7 @@ python
 ```
 
 ```python
-import rastertools_BOULDERING.raster as raster
-import rastertools_BOULDERING.metadata as raster_metadata
-import rastertools_BOULDERING.convert as raster_convert
-import rastertools_BOULDERING.misc as raster_misc
+from shptools_BOULDERING import shp, geometry as shp_geom, geomorph as shp_geomorph, annotations as shp_anno
 ```
 
 ## Getting Started
