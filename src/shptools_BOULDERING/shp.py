@@ -19,49 +19,6 @@ def buffer(in_shp, buffer_dist, out_shp):
     gdf_buffer.geometry = gdf.geometry.buffer(buffer_dist)
     gdf_buffer.to_file(out_shp)
     return (gdf_buffer)
-
-def multi_ring_buffer(in_shp, buffer_dist, number_of_rings, out_shp):
-    gdf = gpd.read_file(in_shp)
-    gdf_buffer = gdf.copy()
-    geoms = []
-    for n in range(number_of_rings + 1):
-        buffer_dist_tmp = (n) * buffer_dist
-        geoms.append(gdf_buffer.geometry.buffer(buffer_dist_tmp).values[0])
-
-    d = {'ringid': list(np.arange(number_of_rings + 1)), 'distance': np.arange(0,buffer_dist * (number_of_rings+1), buffer_dist),
-         'geometry': geoms}
-    gdf_multi_ring = gpd.GeoDataFrame(d, crs=gdf_buffer.crs)
-    gdf_multi_ring.to_file(out_shp)
-    return(gdf_multi_ring)
-
-
-def multi_ring_donut(in_shp, buffer_dist, number_of_rings, out_shp):
-    gdf = gpd.read_file(in_shp)
-    gdf_buffer = gdf.copy()
-    geoms = []
-    for n in range(number_of_rings + 1):
-        buffer_dist_tmp = (n) * buffer_dist
-        geoms.append(gdf_buffer.geometry.buffer(buffer_dist_tmp).values[0])
-
-    d = {'ringid': list(np.arange(number_of_rings + 1)),
-         'distance': np.arange(0, buffer_dist * (number_of_rings + 1), buffer_dist),
-         'geometry': geoms}
-    gdf_multi_ring = gpd.GeoDataFrame(d, crs=gdf_buffer.crs)
-
-    geoms = []
-
-    for n in range(number_of_rings):
-        geoms.append(gdf_multi_ring.iloc[n + 1].geometry.difference(gdf_multi_ring.iloc[n].geometry))
-
-    distance = np.arange(0, buffer_dist * (number_of_rings + 1), buffer_dist)
-    d = {'ringid': list(np.arange(number_of_rings)), 'distance_start': distance[:-1],
-         'distance_end': distance[1:],
-         'geometry': geoms}
-
-    gdf_multi_donut_ring = gpd.GeoDataFrame(d, crs=gdf_buffer.crs)
-    gdf_multi_donut_ring.to_file(out_shp)
-    return (gdf_multi_donut_ring)
-
 def centroid(in_shp, out_shp):
     gdf = gpd.read_file(in_shp)
     gdf_centroids = gdf.copy()

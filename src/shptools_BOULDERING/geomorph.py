@@ -4,6 +4,8 @@ import pandas as pd
 import sys
 
 import rastertools_BOULDERING.raster as raster
+import rastertools_BOULDERING.metadata as raster_metadata
+
 import shptools_BOULDERING.geometry as shp_geom
 import shptools_BOULDERING.shp as shp
 
@@ -132,11 +134,14 @@ def boulder(in_shp, out_shp_mmr, out_shp_geomorph,
     return (gdf_mrr)
 
 
-
-def density(in_shp, in_graticule, in_raster, block_width, block_height, out_shp, out_raster):
-
+def density(in_shp, in_graticule, in_graticule_selection, in_raster, min_eq_diameter, block_width, block_height,
+            out_shp, out_raster):
     """
     This function depends on the filtering apply to in_shp.
+
+    in_shp: need to have eq.diameter calculated
+    in_graticule : need to be the whole graticule!
+    in_graticule_selection: can be either in_graticule or selection of graticule.
     """
 
     assert block_width == block_height, "block width is different than block_height. This is not supported by the current algorithm."
@@ -145,38 +150,47 @@ def density(in_shp, in_graticule, in_raster, block_width, block_height, out_shp,
     out_raster_count = out_raster.with_name(out_raster.stem + "-count.tif")
     out_raster_area = out_raster.with_name(out_raster.stem + "-percentage-covered.tif")
 
+    out_shp1 = in_shp.parent / (
+        "selection-density-min-eq-diameter.shp")  # would be interesting to have the min_eq_diameter included
+    out_shp2 = in_shp.parent / (
+        "spatial-selection-density-min-eq-diameter.shp")  # would be interesting to have the min_eq_diameter included
+    out_shp3 = in_shp.parent / ("spatial-selection-density-min-eq-diameter-centroids.shp")
+
     # read graticule
     gdf_graticule = gpd.read_file(in_graticule)
+    gdf_graticule_selection = gpd.read_file(in_graticule_selection)
 
     # get metadata and resolution of in_raster
-    out_meta = raster.get_raster_profile(in_raster)
-    res = raster.get_raster_resolution(in_raster)[0]
+    out_meta = raster_metadata.get_profile(in_raster)
+    res = raster_metadata.get_resolution(in_raster)[0]
 
-    gdf_centroid = shp.centroid(in_shp, out_shp)
-    gdf_within = gpd.sjoin(gdf_centroid, gdf_graticule, how="inner", op="within")
+    gdf_boulders = gpd.read_file(in_shp)
+    gdf_boulders_selection = gdf_boulders[gdf_boulders.diametereq >= min_eq_diameter]
+    gdf_boulders_selection.to_file(out_shp1)
+    gdf_intersect = shp.intersect(out_shp1, in_graticule_selection, min_area_threshold=0, out_shp=out_shp2)
+
+    gdf_centroid = shp.centroid(out_shp2, out_shp3)
+    gdf_within = gpd.sjoin(gdf_centroid, gdf_graticule_selection, how="inner", op="within")
 
     # number of boulders per tile_id
-    nboulders_per_tile = gdf_within.groupby('tile_id')['id'].nunique()
-
-    area_covered_per_tile = np.round((gdf_within.groupby('tile_id').area.sum() / (
-                block_width * res * block_height * res)) * 100, decimals=0)
-
-    area_covered_per_tile = area_covered_per_tile.astype('int')
+    nboulders_per_tile = gdf_within.groupby('tile_id')['id'].nunique().astype('uint16')  # until here, it is correct
+    tile_area = gdf_graticule_selection.iloc[0].geometry.area
+    density_boulders = np.round(nboulders_per_tile / (tile_area * 10e-6), decimals=0).astype('uint16')
 
     # create a panda dataframe out of it
-    d = {"tile_id":nboulders_per_tile.index.values,
-         "nboulders":nboulders_per_tile.values,
-         "area_cov": area_covered_per_tile.values}
+    d = {"tile_id": nboulders_per_tile.index.values,
+         "nboulders": nboulders_per_tile.values,
+         "dboulders": density_boulders.values}
 
     df = pd.DataFrame(data=d)
 
     # set 0 values for everything
     gdf_graticule["nboulders"] = 0
-    gdf_graticule["area_cov"] = 0
+    gdf_graticule["dboulders"] = 0
 
     # only update the number
     gdf_graticule.nboulders[gdf_graticule.tile_id.isin(df.tile_id)] = df.nboulders.values
-    gdf_graticule.area_cov[gdf_graticule.tile_id.isin(df.tile_id)] = df.area_cov.values
+    gdf_graticule.dboulders[gdf_graticule.tile_id.isin(df.tile_id)] = df.dboulders.values
 
     # attribute joins
     nw = np.arange(0, out_meta["width"], block_width).shape[0]
@@ -184,10 +198,10 @@ def density(in_shp, in_graticule, in_raster, block_width, block_height, out_shp,
 
     # generate array
     array_count = gdf_graticule.nboulders.values.reshape((nw, nh)).T
-    array_area = gdf_graticule.area_cov.values.reshape((nw, nh)).T
+    array_area = gdf_graticule.dboulders.values.reshape((nw, nh)).T
     bbox_unary = gdf_graticule.geometry.unary_union.bounds
     out_transform = Affine(block_width * res, 0.0, bbox_unary[0], 0.0, -block_width * res, bbox_unary[3])
-    out_meta.update({'width': nw, 'height': nh, 'transform': out_transform})
+    out_meta.update({'dtype': 'uint16', 'width': nw, 'height': nh, 'transform': out_transform})
     raster.save(out_raster_count, np.expand_dims(array_count, axis=2), out_meta, is_image=True)
     raster.save(out_raster_area, np.expand_dims(array_area, axis=2), out_meta, is_image=True)
 
