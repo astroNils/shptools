@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ProjectModuleManager">
+    <modules>
+      <module fileurl="file://$PROJECT_DIR$/../MLtools/.idea/MLtools.iml" filepath="$PROJECT_DIR$/../MLtools/.idea/MLtools.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../download_planetary_datasets/.idea/download_planetary_datasets.iml" filepath="$PROJECT_DIR$/../download_planetary_datasets/.idea/download_planetary_datasets.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../rastertools/.idea/rastertools.iml" filepath="$PROJECT_DIR$/../rastertools/.idea/rastertools.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/shptools.iml" filepath="$PROJECT_DIR$/.idea/shptools.iml" />
+    </modules>
+  </component>
+</project>

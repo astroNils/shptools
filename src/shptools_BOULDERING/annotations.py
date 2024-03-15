@@ -203,6 +203,7 @@ def annotations_to_df(df, dataset_directory, block_width, block_height, add_one,
                 bbox_xyxy.append(bbox_numpy(out[0] > 0, add_one))
 
             # Then I have to convert the masks (as rle...) bit mask...
+            # I could add skimage.morphology.remove_small_holes to be sure to get rid of artefacts?
             for m in masks:
                 rle_mask.append(mask.encode(np.asarray(m, order="F")))
 
