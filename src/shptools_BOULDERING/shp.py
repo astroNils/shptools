@@ -9,17 +9,66 @@ from tqdm import tqdm
 import rastertools_BOULDERING.raster as raster
 
 def bbox_to_shp(bbox, crs_wkt, out_shp):
+    """
+    Convert a bounding box to a shapefile.
+    
+    Parameters
+    ----------
+    bbox : tuple
+        Bounding box coordinates (minx, miny, maxx, maxy)
+    crs_wkt : str
+        Coordinate reference system in WKT format
+    out_shp : str or Path
+        Path to output shapefile
+        
+    Returns
+    -------
+    geopandas.GeoSeries
+        GeoSeries containing the bounding box polygon
+    """
     gs = gpd.GeoSeries(box(*bbox), crs=crs_wkt)
     gs.to_file(out_shp)
     return (gs)
 
 def buffer(in_shp, buffer_dist, out_shp):
+    """
+    Create a buffer around geometries in a shapefile.
+    
+    Parameters
+    ----------
+    in_shp : str or Path
+        Path to input shapefile
+    buffer_dist : float
+        Buffer distance in map units
+    out_shp : str or Path
+        Path to output shapefile
+        
+    Returns
+    -------
+    geopandas.GeoDataFrame
+        DataFrame containing buffered geometries
+    """
     gdf = gpd.read_file(in_shp)
     gdf_buffer = gdf.copy()
     gdf_buffer.geometry = gdf.geometry.buffer(buffer_dist)
     gdf_buffer.to_file(out_shp)
     return (gdf_buffer)
 def centroid(in_shp, out_shp):
+    """
+    Calculate centroids of geometries in a shapefile.
+    
+    Parameters
+    ----------
+    in_shp : str or Path
+        Path to input shapefile
+    out_shp : str or Path
+        Path to output shapefile
+        
+    Returns
+    -------
+    geopandas.GeoDataFrame
+        DataFrame containing centroid points
+    """
     gdf = gpd.read_file(in_shp)
     gdf_centroids = gdf.copy()
     gdf_centroids.geometry = gdf.geometry.centroid
@@ -27,6 +76,25 @@ def centroid(in_shp, out_shp):
     return (gdf_centroids)
 
 def shift(in_shp, shift_x, shift_y, out_shp):
+    """
+    Shift geometries in a shapefile by given x and y offsets.
+    
+    Parameters
+    ----------
+    in_shp : str or Path
+        Path to input shapefile
+    shift_x : float
+        Shift distance in x direction
+    shift_y : float
+        Shift distance in y direction
+    out_shp : str or Path
+        Path to output shapefile
+        
+    Returns
+    -------
+    geopandas.GeoDataFrame
+        DataFrame containing shifted geometries
+    """
     in_polygon = Path(in_shp)
     gdf = gpd.read_file(in_polygon)
     geom_shifted = gdf.geometry.translate(xoff=shift_x, yoff=shift_y)
@@ -37,12 +105,27 @@ def shift(in_shp, shift_x, shift_y, out_shp):
 
 def rasterize(shapes, out_meta, out_raster, initial_values=0):
     """
-    Input as it is for more flexibility.
-    Example:
-    gdf_poly = gpd.read_file(polygon_shp)
-    gdf_poly.constant = 1
-    shapes = ((geom,value) for geom, value in zip(gdf_poly.geometry, gdf_poly.constant.values.astype('uint8')))
-    rasterize(shapes, out_meta, out_raster, initial_values=0)
+    Convert vector shapes to a raster.
+    
+    Parameters
+    ----------
+    shapes : iterable
+        Iterable of (geometry, value) pairs
+    out_meta : dict
+        Output raster metadata including 'height', 'width', and 'transform'
+    out_raster : str or Path
+        Path to output raster file
+    initial_values : int, optional
+        Initial value for raster cells, by default 0
+        
+    Notes
+    -----
+    Example usage:
+    >>> gdf_poly = gpd.read_file(polygon_shp)
+    >>> gdf_poly.constant = 1
+    >>> shapes = ((geom,value) for geom, value in zip(gdf_poly.geometry, 
+                  gdf_poly.constant.values.astype('uint8')))
+    >>> rasterize(shapes, out_meta, out_raster, initial_values=0)
     """
     burned = features.rasterize(shapes=shapes, fill=initial_values, out_shape=(out_meta["height"], out_meta["width"]),
                                 transform=out_meta["transform"])
@@ -52,11 +135,29 @@ def rasterize(shapes, out_meta, out_raster, initial_values=0):
 
 def clip(in_shp, mask_shp, min_area_threshold, out_shp):
     """
-    clip/intersect but with clipping of edges.
-    replace clip_boulders in create_annotations.py (without the pkl part, which was only needed for the creation of polygon,
-    maybe could move clip_boulders to misc.py?
-    clip_from_polygon? in analysis.py (not used and was actually not giving the good clipping values!)
-    replace footprints_intersect
+    Clip features in a shapefile using a mask shapefile.
+    
+    Parameters
+    ----------
+    in_shp : str or Path
+        Path to input shapefile
+    mask_shp : str or Path
+        Path to mask shapefile
+    min_area_threshold : float
+        Minimum area threshold for keeping clipped features
+    out_shp : str or Path
+        Path to output shapefile
+        
+    Returns
+    -------
+    geopandas.GeoDataFrame
+        DataFrame containing clipped geometries
+        
+    Notes
+    -----
+    Performs intersection with clipping of edges. Features smaller than 
+    min_area_threshold are removed. MultiPolygons are exploded into 
+    separate polygons.
     """
 
     in_shp = Path(in_shp)
@@ -84,14 +185,28 @@ def clip(in_shp, mask_shp, min_area_threshold, out_shp):
 
 def intersect(in_shp, mask_shp, min_area_threshold, out_shp):
     """
-    Intersect but with no clipping of edges!
-
-    replace polygon_within_tile in analysis.py (exactly the same!)
-    replace selection_wout_clipping in analysis.py (exactly the same!)
-    replace intersect2 (deleted)
-    replace is_within_tile (not the same, generate centroid and do a spatial join for calculating the density)
-    is_polygon_within (exactly the same!) deleted
-    is_point_within (exactly the same!) deleted
+    Find intersection between features in two shapefiles without clipping edges.
+    
+    Parameters
+    ----------
+    in_shp : str or Path
+        Path to input shapefile
+    mask_shp : str or Path
+        Path to mask shapefile
+    min_area_threshold : float
+        Minimum area threshold for keeping intersected features
+    out_shp : str or Path
+        Path to output shapefile
+        
+    Returns
+    -------
+    geopandas.GeoDataFrame
+        DataFrame containing intersected geometries
+        
+    Notes
+    -----
+    Similar to clip() but preserves original geometries that intersect with
+    the mask, rather than clipping them to the mask boundary.
     """
 
     in_shp = Path(in_shp)
@@ -117,6 +232,26 @@ def intersect(in_shp, mask_shp, min_area_threshold, out_shp):
     return (gdf_intersect)
 
 def remove_multipolygon(gdf, min_area_threshold):
+    """
+    Explode MultiPolygons into separate Polygons and filter by area.
+    
+    Parameters
+    ----------
+    gdf : geopandas.GeoDataFrame
+        Input GeoDataFrame containing MultiPolygons
+    min_area_threshold : float
+        Minimum area threshold for keeping polygons
+        
+    Returns
+    -------
+    geopandas.GeoDataFrame
+        DataFrame with MultiPolygons exploded into separate Polygons,
+        filtered by minimum area
+        
+    Notes
+    -----
+    Prints number of MultiPolygons removed and number of new Polygons added.
+    """
     gdf_multipolygon = gdf[gdf.geometry.geom_type == "MultiPolygon"]
 
     if gdf_multipolygon.shape[0] > 0:
@@ -145,15 +280,23 @@ def remove_multipolygon(gdf, min_area_threshold):
 # or calculate shape of geometry and find most similar automatically?
 
 def distance_between(in_shp1, in_shp2, reindex=False):
-    '''
-    distance between features (dimension: in_shp2 x in_shp1).
-    Not calculate from the middle of the shapefile?
-    Maybe use gdf.geometry.centroid.x.values if this behavior is wanted?
-    :param in_shp1:
-    :param in_shp2:
-    :param reindex:
-    :return:
-    '''
+    """
+    Calculate distances between all features in two shapefiles.
+    
+    Parameters
+    ----------
+    in_shp1 : str or Path
+        Path to first input shapefile
+    in_shp2 : str or Path
+        Path to second input shapefile
+    reindex : bool, optional
+        Whether to reindex features with new IDs, by default False
+        
+    Returns
+    -------
+    numpy.ndarray
+        2D array of distances with shape (n_features2, n_features1)
+    """
 
     in_shp1= Path(in_shp1)
     in_shp2 = Path(in_shp2)
@@ -177,6 +320,29 @@ def distance_between(in_shp1, in_shp2, reindex=False):
 # or conversion to raster for simplification? for use of
 
 def shift_between(in_shp1, in_shp2):
+    """
+    Calculate shifts between corresponding features in two shapefiles.
+    
+    Parameters
+    ----------
+    in_shp1 : str or Path
+        Path to first input shapefile
+    in_shp2 : str or Path
+        Path to second input shapefile
+        
+    Returns
+    -------
+    tuple of geopandas.GeoDataFrame
+        Two GeoDataFrames with added columns:
+        - cdistance: distance between corresponding features
+        - shift_x: x-direction shift
+        - shift_y: y-direction shift
+        
+    Notes
+    -----
+    Features must have matching IDs in both shapefiles. Calculates shifts
+    between centroids of corresponding features.
+    """
 
     """
     probably used in the notebook to calculate shift between two datasets.

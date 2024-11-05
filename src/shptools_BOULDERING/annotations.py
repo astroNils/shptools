@@ -13,7 +13,31 @@ from shapely.geometry import box
 from tqdm import tqdm
 
 def tile_from_dataframe(df, dataset_directory, resolution_limit):
-    print("...Generating one boulder outline shapefile per image patch...")
+    """
+    Generate one boulder outline shapefile per image patch from a DataFrame.
+    
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        DataFrame containing image patch information with columns:
+        - dataset: name of dataset
+        - raster_ap: path to raster file
+        - boulder_ap: path to boulder shapefile
+        - bbox_im: bounding box coordinates
+        - pix_res: pixel resolution
+        - file_name: output filename
+    dataset_directory : str or Path
+        Root directory where dataset folders will be created
+    resolution_limit : float
+        Minimum resolution limit for filtering boulders. Boulders smaller than 
+        (resolution_limit * pixel_resolution)^2 will be filtered out
+        
+    Notes
+    -----
+    Creates a folder structure under dataset_directory with subfolders for each 
+    dataset containing 'labels' directories. Each image patch gets its own shapefile
+    with boulder outlines clipped to the patch boundaries.
+    """
 
     dataset_directory = Path(dataset_directory)
     datasets = df.dataset.unique()
@@ -59,21 +83,27 @@ def tile_from_dataframe(df, dataset_directory, resolution_limit):
                 gdf_empty.to_file(filename_shp, driver='ESRI Shapefile', schema=schema, crs=row.coord_sys)
 def split_global(df, gdf, split):
     """
-    Shuffle tiles and randomly distributes the selection rectangle grids /
-    graticules into a train / validation / test datasets (respecting the
-    split values specified in <split>).
-
-    A "dataset" column is added to both the DataFrame and GeoDataFrame.
-
-    Note that the split here is a global split, meaning that regardless of the
-    number of rectangle grids per images, it just randomly distributes across
-    the train / validation / test datasets. Another function needs to be written
-    if a split per image is wanted... TODO...
-
-    :param df_selection_tiles:
-    :param gdf_selection_tiles_updated:
-    :param split:
-    :return:
+    Randomly distribute tiles into train/validation/test datasets globally.
+    
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        DataFrame containing tile information
+    gdf : geopandas.GeoDataFrame
+        GeoDataFrame containing tile geometries
+    split : tuple of float
+        Tuple containing (train_fraction, validation_fraction).
+        Test fraction will be the remaining percentage.
+        
+    Returns
+    -------
+    tuple
+        (df, gdf) with added 'dataset' column indicating split assignment
+        
+    Notes
+    -----
+    Uses a fixed random seed (27) for reproducibility. Splits are done globally
+    across all tiles regardless of which image they came from.
     """
     #out_shapefile = Path(out_shapefile)
 
@@ -97,6 +127,27 @@ def split_global(df, gdf, split):
 
 
 def split_per_image(df, split):
+    """
+    Randomly distribute tiles into train/validation/test datasets per image.
+    
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        DataFrame containing tile information with 'image_id' column
+    split : tuple of float
+        Tuple containing (train_fraction, validation_fraction).
+        Test fraction will be the remaining percentage.
+        
+    Returns
+    -------
+    pandas.DataFrame
+        DataFrame with added 'dataset' column indicating split assignment
+        
+    Notes
+    -----
+    Uses a fixed random seed (27) for reproducibility. Splits are done 
+    independently for tiles from each unique image_id.
+    """
     np.random.seed(seed=27)
     print("...Assigning train/validation/test datasets to tiles...")
     train_tiles = []
@@ -133,8 +184,21 @@ def split_per_image(df, split):
     return (df_selection_tiles_split)
 
 def semantic_segm_mask(image, labels):
-    """No filtering including here"""
-
+    """
+    Generate semantic segmentation mask from vector labels.
+    
+    Parameters
+    ----------
+    image : str or Path
+        Path to input image file
+    labels : str or Path
+        Path to input shapefile containing polygon labels
+        
+    Notes
+    -----
+    Creates a binary mask TIFF file with same name as input but '_segmask.tif'
+    suffix. Mask pixels are 1 where polygons exist, 0 elsewhere.
+    """
     image = Path(image)
     labels = Path(labels)
     seg_mask_filename = Path(
@@ -156,6 +220,18 @@ def semantic_segm_mask(image, labels):
     raster.save(seg_mask_filename, seg_mask_byte, out_meta, False)
 
 def gen_semantic_segm_mask(df, dataset_directory):
+    """
+    Generate semantic segmentation masks for all tiles in DataFrame.
+    
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        DataFrame containing tile information with columns:
+        - dataset: dataset name 
+        - file_name: tile filename
+    dataset_directory : str or Path
+        Root directory containing dataset folders
+    """
     print("...Generating semantic segmentation masks...")
     ntiles = df.shape[0]
     for index, row in tqdm(df.iterrows(), total=ntiles):
@@ -164,6 +240,34 @@ def gen_semantic_segm_mask(df, dataset_directory):
         semantic_segm_mask(image, labels)
 
 def annotations_to_df(df, dataset_directory, block_width, block_height, add_one, json_out):
+    """
+    Convert annotations to Detectron2 dataset format.
+    
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        DataFrame containing tile information
+    dataset_directory : str or Path
+        Root directory containing dataset folders
+    block_width : int
+        Width of image blocks in pixels
+    block_height : int
+        Height of image blocks in pixels  
+    add_one : bool
+        Whether to add 1 to bbox coordinates
+    json_out : str or Path
+        Output JSON file path
+        
+    Returns
+    -------
+    pandas.DataFrame
+        DataFrame in Detectron2 format with annotations
+        
+    Notes
+    -----
+    Converts polygon annotations to COCO-style format with RLE masks and 
+    bounding boxes. Output JSON follows Detectron2 custom dataset format.
+    """
     print("...Generating Detectron2 custom dataset from dataframe...")
 
     ntiles = df.shape[0]
@@ -220,6 +324,26 @@ def annotations_to_df(df, dataset_directory, block_width, block_height, add_one,
     return (df_json)
 
 def bbox_numpy(img, add_one=True):
+    """
+    Get bounding box coordinates from binary image.
+    
+    Parameters
+    ----------
+    img : ndarray
+        Binary image array
+    add_one : bool, optional
+        Whether to add 1 to max coordinates, by default True
+        
+    Returns
+    -------
+    list
+        Bounding box coordinates [xmin, ymin, xmax, ymax] as floats
+        
+    Notes
+    -----
+    Similar behavior to Detectron2's bbox computation. When add_one=True,
+    coordinates are compatible with QGIS display.
+    """
     # similar behavior as Detectron2 (with +1, make sense in QGIS)
     rows = np.any(img, axis=1)
     cols = np.any(img, axis=0)

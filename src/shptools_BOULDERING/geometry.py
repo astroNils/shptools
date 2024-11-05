@@ -11,6 +11,27 @@ from tqdm import tqdm
 
 # TODO > multiple buffer (multi-ring, but as disk)
 def minimum_rotated_rectangle(in_shp, out_shp):
+    """
+    Compute the minimum rotated rectangle for each polygon in a shapefile.
+    
+    Parameters
+    ----------
+    in_shp : str or Path
+        Path to input shapefile containing polygons
+    out_shp : str or Path
+        Path to output shapefile where rotated rectangles will be saved
+        
+    Returns
+    -------
+    geopandas.GeoDataFrame
+        DataFrame containing the minimum rotated rectangles with same 
+        attributes as input
+        
+    Notes
+    -----
+    Uses shapely's minimum_rotated_rectangle algorithm to find the smallest
+    rectangle that contains each polygon while allowing rotation.
+    """
     gdf = gpd.read_file(in_shp)
     gdf_mrr = gdf.copy()
     n = gdf_mrr.shape[0]
@@ -25,6 +46,32 @@ def minimum_rotated_rectangle(in_shp, out_shp):
 
 
 def camembert(in_shp_point, radius, angle_per_camembert, labels, out_shp):
+    """
+    Create a circular partition around a point divided into angular sectors.
+    
+    Parameters
+    ----------
+    in_shp_point : str or Path
+        Path to input shapefile containing a single point
+    radius : float
+        Radius of the circle in map units
+    angle_per_camembert : float
+        Angular width of each sector in degrees
+    labels : list of str
+        Labels for each sector (e.g. ["N", "NE", "E", "SE", "S", "SW", "W", "NW"])
+    out_shp : str or Path
+        Path to output shapefile where sectors will be saved
+        
+    Returns
+    -------
+    geopandas.GeoDataFrame
+        DataFrame containing the sector polygons with their labels
+        
+    Notes
+    -----
+    Creates a circular partition centered on the input point, divided into equal 
+    angular sectors. Useful for directional analysis.
+    """
 
     gdf = gpd.read_file(in_shp_point)
     xc = gdf.geometry.x.values[0]
@@ -55,6 +102,32 @@ def camembert(in_shp_point, radius, angle_per_camembert, labels, out_shp):
     return (gdf_pol)
 
 def ellipse(in_shp_polygon, res, out_shp):
+    """
+    Fit ellipses to polygon outlines.
+    
+    Parameters
+    ----------
+    in_shp_polygon : str or Path
+        Path to input shapefile containing polygons
+    res : float
+        Resolution for segmentizing the polygons before fitting
+    out_shp : str or Path
+        Path to output shapefile where fitted ellipses will be saved
+        
+    Returns
+    -------
+    geopandas.GeoDataFrame
+        DataFrame containing fitted ellipses and their parameters:
+        - a : semi-major axis length
+        - b : semi-minor axis length  
+        - theta : rotation angle in radians
+        
+    Notes
+    -----
+    Uses scikit-image's EllipseModel to fit ellipses to polygon outlines.
+    The input polygons are first segmentized to the specified resolution.
+    If fitting fails for any polygon, the original shape is retained.
+    """
     gdf = gpd.read_file(in_shp_polygon)
     gdf_ellipse = gdf.copy()
     gdf_ellipse["geometry"] = segmentize(gdf_ellipse.geometry, res) # two times the resolution.
@@ -88,6 +161,29 @@ def ellipse(in_shp_polygon, res, out_shp):
     return gdf_ellipse
 
 def circle(in_shp_polygon, res, out_shp):
+    """
+    Fit circles to polygon outlines.
+    
+    Parameters
+    ----------
+    in_shp_polygon : str or Path
+        Path to input shapefile containing polygons
+    res : float
+        Resolution for segmentizing the polygons before fitting
+    out_shp : str or Path
+        Path to output shapefile where fitted circles will be saved
+        
+    Returns
+    -------
+    geopandas.GeoDataFrame
+        DataFrame containing fitted circles and their parameters:
+        - r : radius
+        
+    Notes
+    -----
+    Uses scikit-image's CircleModel to fit circles to polygon outlines.
+    The input polygons are first segmentized to the specified resolution.
+    """
     gdf = gpd.read_file(in_shp_polygon)
     gdf_circle = gdf.copy()
     gdf_circle["geometry"] = segmentize(gdf_circle.geometry, res)
@@ -107,17 +203,71 @@ def circle(in_shp_polygon, res, out_shp):
     return gdf_circle
 
 def createEllipse(row):
+    """
+    Create an ellipse polygon from parameters.
+    
+    Parameters
+    ----------
+    row : pandas.Series
+        Row containing ellipse parameters:
+        - geometry : center point
+        - long_axis : major axis length
+        - short_axis : minor axis length
+        - angle : rotation angle in degrees
+        
+    Returns
+    -------
+    shapely.geometry.Polygon
+        Ellipse polygon
+    """
     circ = shapely.geometry.Point(row.geometry.centroid.x, row.geometry.centroid.y).buffer(1)
     ell = shapely.affinity.scale(circ, row.long_axis/2.0, row.short_axis/2.0)
     elrv = shapely.affinity.rotate(ell, 90 - row.angle)
     return (elrv)
 
 def createCircle(row):
+    """
+    Create a circle polygon from parameters.
+    
+    Parameters
+    ----------
+    row : pandas.Series
+        Row containing circle parameters:
+        - geometry : center point
+        - diametersq : squared diameter
+        
+    Returns
+    -------
+    shapely.geometry.Polygon
+        Circle polygon
+    """
     circ = shapely.geometry.Point(row.geometry.centroid.x,row.geometry.centroid.y).buffer(1)
     circ = shapely.affinity.scale(circ, row.diametersq/2.0, row.diametersq/2.0)
     return (circ)
 
 def fitEllipse(row):
+    """
+    Fit an ellipse to a polygon outline.
+    
+    Parameters
+    ----------
+    row : pandas.Series
+        Row containing polygon geometry
+        
+    Returns
+    -------
+    tuple
+        (shapely.geometry.Polygon, a, b, theta) where:
+        - Polygon is the fitted ellipse
+        - a is the semi-major axis length
+        - b is the semi-minor axis length
+        - theta is the rotation angle in radians
+        
+    Notes
+    -----
+    Uses scikit-image's EllipseModel to fit an ellipse to the polygon vertices.
+    Coordinates are centered before fitting.
+    """
     ell = EllipseModel()
     x = np.array(row.geometry.exterior.coords.xy[0])
     xc = row.geometry.centroid.x
@@ -138,6 +288,26 @@ def fitEllipse(row):
     return (geometry.Polygon(xy_ell), a, b, theta)
 
 def fitCircle(row):
+    """
+    Fit a circle to a polygon outline.
+    
+    Parameters
+    ----------
+    row : pandas.Series
+        Row containing polygon geometry
+        
+    Returns
+    -------
+    tuple
+        (shapely.geometry.Polygon, r) where:
+        - Polygon is the fitted circle
+        - r is the radius
+        
+    Notes
+    -----
+    Uses scikit-image's CircleModel to fit a circle to the polygon vertices.
+    Coordinates are centered before fitting.
+    """
     circ = CircleModel()
     x = np.array(row.geometry.exterior.coords.xy[0])
     xc = row.geometry.centroid.x
@@ -157,6 +327,32 @@ def fitCircle(row):
     return(geometry.Polygon(xy_circle), r)
 
 def multi_ring_buffer(in_shp, buffer_dist, number_of_rings, out_shp):
+    """
+    Create multiple concentric buffer rings around geometries.
+    
+    Parameters
+    ----------
+    in_shp : str or Path
+        Path to input shapefile
+    buffer_dist : float
+        Distance between consecutive rings
+    number_of_rings : int
+        Number of buffer rings to create
+    out_shp : str or Path
+        Path to output shapefile
+        
+    Returns
+    -------
+    geopandas.GeoDataFrame
+        DataFrame containing buffer rings with attributes:
+        - ringid : ring number (0 to number_of_rings)
+        - distance : distance from original geometry
+        
+    Notes
+    -----
+    Creates concentric buffer rings at equal intervals. Each ring includes
+    the area of inner rings (cumulative buffers).
+    """
     gdf = gpd.read_file(in_shp)
     gdf_buffer = gdf.copy()
     geoms = []
@@ -172,6 +368,34 @@ def multi_ring_buffer(in_shp, buffer_dist, number_of_rings, out_shp):
 
 
 def multi_ring_donut(in_shp, buffer_dist, number_of_rings, out_shp):
+    """
+    Create multiple concentric donut rings around geometries.
+    
+    Parameters
+    ----------
+    in_shp : str or Path
+        Path to input shapefile
+    buffer_dist : float
+        Distance between consecutive rings
+    number_of_rings : int
+        Number of donut rings to create
+    out_shp : str or Path
+        Path to output shapefile
+        
+    Returns
+    -------
+    geopandas.GeoDataFrame
+        DataFrame containing donut rings with attributes:
+        - ringid : ring number (0 to number_of_rings-1)
+        - ring_start : inner radius index
+        - ring_end : outer radius index
+        - buffer_dis : distance between rings
+        
+    Notes
+    -----
+    Creates concentric donut rings at equal intervals. Each ring excludes
+    the area of inner rings (non-cumulative buffers).
+    """
     gdf = gpd.read_file(in_shp)
     gdf_buffer = gdf.copy()
     geoms = []
@@ -201,23 +425,46 @@ def multi_ring_donut(in_shp, buffer_dist, number_of_rings, out_shp):
     return (gdf_multi_donut_ring)
 
 def dart(in_shp_point, radius, number_of_rings, angle_per_camembert, labels, out_shp):
-
     """
-
-    Args:
-        in_shp_point:
-        radius:
-        number_of_rings:
-        angle_per_camembert:
-        labels:
-        out_shp:
-
-    Returns:
-
-    labels = ["E", "NE", "N", "NW", "W", "SW", "S", "SE"] # angle_per_camembert = 45.0
-    labels = ["E", "NE1", "NE2", "NE3", "N", "NW1", "NW2",
-    "NW3", "W", "SW1", "SW2", "SW3", "S", "SE1", "SE2", "SE3"] # angle_per_camembert = 22.5
-    labels = ["E", "ENE", "NE", "NNE", "N", "NNW", "NW", "WNW", "W", "WSW", "SW", "SSW", "S", "SSE", "SE", "ESE"]
+    Create a dartboard-like grid combining angular sectors and distance rings.
+    
+    Parameters
+    ----------
+    in_shp_point : str or Path
+        Path to input shapefile containing a single point
+    radius : float
+        Distance between consecutive rings
+    number_of_rings : int
+        Number of distance rings
+    angle_per_camembert : float
+        Angular width of each sector in degrees
+    labels : list of str
+        Labels for each sector (e.g. ["N", "NE", "E", "SE", "S", "SW", "W", "NW"])
+    out_shp : str or Path
+        Path to output shapefile
+        
+    Returns
+    -------
+    geopandas.GeoDataFrame
+        DataFrame containing grid cells with attributes:
+        - id : unique cell identifier
+        - directions : sector label
+        - ringid : ring number
+        - ring_start : inner radius index
+        - ring_end : outer radius index
+        - buffer_dis : distance between rings
+        
+    Notes
+    -----
+    Combines angular sectors (like camembert) with distance rings (like multi_ring_donut)
+    to create a grid useful for directional and distance-based analysis.
+    
+    Examples
+    --------
+    Common label schemes:
+    - 8 directions: ["E", "NE", "N", "NW", "W", "SW", "S", "SE"]
+    - 16 directions: ["E", "ENE", "NE", "NNE", "N", "NNW", "NW", "WNW", 
+                     "W", "WSW", "SW", "SSW", "S", "SSE", "SE", "ESE"]
     """
 
     gdf = gpd.read_file(in_shp_point)

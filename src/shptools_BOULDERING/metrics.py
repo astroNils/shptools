@@ -9,16 +9,50 @@ from rastertools_BOULDERING import raster, metadata as raster_metadata
 def batch_calculate_iou(ground_truth, predictions, in_raster, area,
                         iou_threshold):
     """
-    Currently used.
-
-    Area needs to be tuple (min_area, max_area)
-    In number of pixels/area
-
-    small : (6*6, 12*12)
-    medium : (12*12, 24*24)
-    large : (24*24, 48*48)
-    very large : (48*48, 512*512)
-    all : (0, 1024*1024) # don't expect boulders larger than 1024x1024 pixels!
+    Calculate Intersection over Union (IoU) metrics for boulder detection.
+    
+    Parameters
+    ----------
+    ground_truth : str or Path
+        Path to ground truth shapefile containing boulder polygons
+    predictions : str or Path
+        Path to predictions shapefile containing detected boulder polygons
+    in_raster : str or Path
+        Path to input raster file for resolution information
+    area : tuple or list of tuples
+        Size ranges for boulder filtering in pixels. Each tuple contains:
+        (min_area, max_area) in number of pixels
+        Common ranges:
+        - small: (6*6, 12*12)
+        - medium: (12*12, 24*24)
+        - large: (24*24, 48*48)
+        - very large: (48*48, 512*512)
+        - all: (0, 1024*1024)
+    iou_threshold : float or list of float
+        IoU threshold(s) for considering a detection as correct
+        
+    Returns
+    -------
+    tuple
+        (areas, iou_thresholds, precisions, recalls, f1_scores, n_boulders,
+         gdf_gt_filtered, gdf_pred_filtered, best_matches_ious, best_matches_idxs)
+        where:
+        - areas: input area ranges
+        - iou_thresholds: input IoU thresholds
+        - precisions: precision scores for each area/threshold combination
+        - recalls: recall scores for each area/threshold combination
+        - f1_scores: F1 scores for each area/threshold combination
+        - n_boulders: number of matched boulders for each combination
+        - gdf_gt_filtered: filtered ground truth GeoDataFrame
+        - gdf_pred_filtered: filtered predictions GeoDataFrame
+        - best_matches_ious: IoU values for best matches
+        - best_matches_idxs: indices of best matches
+        
+    Notes
+    -----
+    The function filters boulders by area and calculates precision/recall metrics
+    using bounding box IoU. Multiple area ranges and IoU thresholds can be 
+    evaluated in a single pass.
     """
 
     # raster resolution
@@ -107,6 +141,41 @@ def batch_calculate_iou(ground_truth, predictions, in_raster, area,
 
 def format_iou_to_pd(areas, iou_thresholds, precisions, recalls, f1_scores,
                      n_boulders):
+    """
+    Format IoU evaluation results into pandas DataFrames.
+    
+    Parameters
+    ----------
+    areas : list of tuple
+        List of (min_area, max_area) tuples defining boulder size ranges
+    iou_thresholds : list of float
+        List of IoU thresholds used for evaluation
+    precisions : list of float
+        Precision scores for each area/threshold combination
+    recalls : list of float
+        Recall scores for each area/threshold combination
+    f1_scores : list of float
+        F1 scores for each area/threshold combination
+    n_boulders : list of int
+        Number of matched boulders for each combination
+        
+    Returns
+    -------
+    list of pandas.DataFrame
+        List of DataFrames, one per area range, containing:
+        - recall: recall scores per IoU threshold
+        - precision: precision scores per IoU threshold
+        - f1_score: F1 scores per IoU threshold
+        - n_boulders: number of matched boulders per threshold
+        DataFrame indices are IoU thresholds * 100 (as integers)
+        
+    Notes
+    -----
+    Reshapes the flat evaluation results into a more convenient format
+    with one DataFrame per area range, making it easier to analyze 
+    performance across different IoU thresholds.
+    """
+
     recalls_reshaped = np.array(recalls).reshape(len(areas),
                                                  len(iou_thresholds))
     precisions_reshaped = np.array(precisions).reshape(len(areas),

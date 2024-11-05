@@ -14,16 +14,57 @@ from affine import Affine
 from tqdm import tqdm
 
 def distance(x1, y1, x2, y2):
-    "Distance between 2 points."
+    """
+    Calculate Euclidean distance between two points.
+    
+    Parameters
+    ----------
+    x1 : float
+        x-coordinate of first point
+    y1 : float
+        y-coordinate of first point
+    x2 : float
+        x-coordinate of second point
+    y2 : float
+        y-coordinate of second point
+        
+    Returns
+    -------
+    float
+        Euclidean distance between the points
+    """
     return np.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2)
 
 def azimuth(x1, y1, x2, y2):
-    """azimuth between 2 points. The north is degree 0.
-
-    (QGIS) North 0; East 90; South 180; West 270; North 360
-    (1) North 0; East 90; South 180; West -90; North -180 (interval -180 - 180) - OK
-    (2) North 0; East 90; South 180; West 270; North 360 (interval 0-360) - OK
-    (3) North 0; East 90; South 180; West 90; North 0 (interval 0-180) - double check
+    """
+    Calculate azimuth angles between two points.
+    
+    Parameters
+    ----------
+    x1 : float
+        x-coordinate of first point
+    y1 : float
+        y-coordinate of first point
+    x2 : float
+        x-coordinate of second point
+    y2 : float
+        y-coordinate of second point
+        
+    Returns
+    -------
+    tuple
+        Three different angle representations:
+        - angle in interval [-180, 180] degrees
+        - angle in interval [0, 360] degrees
+        - angle in interval [0, 180] degrees
+        
+    Notes
+    -----
+    The angles follow these conventions:
+    - North is 0 degrees
+    - East is 90 degrees
+    - South is 180 degrees
+    - West is either -90, 270, or 90 degrees depending on representation
     """
     # let's take the absolute value of y2 - y1 to avoid values above 180 degrees
     angle = np.arctan2(x2 - x1, y2 - y1)
@@ -32,6 +73,29 @@ def azimuth(x1, y1, x2, y2):
             np.degrees(angle) if angle > 0 else np.degrees(angle) + 180)
 
 def filter_by_area(in_shp, area_threshold, out_shp, reindex=True):
+    """
+    Filter polygons in a shapefile by minimum area threshold.
+    
+    Parameters
+    ----------
+    in_shp : str or Path
+        Path to input shapefile
+    area_threshold : float
+        Minimum area threshold for filtering
+    out_shp : str or Path
+        Path to output filtered shapefile
+    reindex : bool, optional
+        Whether to reindex the filtered features, by default True
+        
+    Returns
+    -------
+    geopandas.GeoDataFrame
+        DataFrame containing filtered polygons with attributes:
+        - x : centroid x-coordinate
+        - y : centroid y-coordinate
+        - poly_area : polygon area
+        - id : feature index (if reindex=True)
+    """
     gdf = gpd.read_file(in_shp)
     gdf["x"] = gdf.geometry.centroid.x.values
     gdf["y"] = gdf.geometry.centroid.y.values
@@ -45,9 +109,32 @@ def filter_by_area(in_shp, area_threshold, out_shp, reindex=True):
 
 def boulder_row(row):
     """
-    Here is a function which takes the geometry of a minimum_rotated_rectangle
-    polygon and compute the main basis parameter such as width, length, short
-    and long axes, diameter, squared diameter, and rotation angle of the boulder.
+    Calculate geometric parameters for a minimum rotated rectangle polygon.
+    
+    Parameters
+    ----------
+    row : pandas.Series
+        Row containing polygon geometry from a GeoDataFrame
+        
+    Returns
+    -------
+    tuple
+        (length, width, long_axis, short_axis, diameter, 
+         rotation_angle_default, rotation_angle360, rotation_angle180)
+        where:
+        - length : longer side of rectangle
+        - width : shorter side of rectangle
+        - long_axis : maximum of length and width
+        - short_axis : minimum of length and width
+        - diameter : average of long and short axes
+        - rotation_angle_default : angle in [-180, 180] degrees
+        - rotation_angle360 : angle in [0, 360] degrees
+        - rotation_angle180 : angle in [0, 180] degrees
+        
+    Notes
+    -----
+    The rotation angles are calculated relative to North (0 degrees)
+    based on the orientation of the longer axis.
     """
     bbox = list(row.geometry.exterior.coords)
     width = distance(bbox[0][0], bbox[0][1], bbox[3][0], bbox[3][1])
@@ -69,16 +156,46 @@ def boulder_row(row):
 def boulder(in_shp, out_shp_mmr, out_shp_geomorph,
             crater_centre_point, crater_diameter, is_boulder=True):
     """
-    filter_by_area should be run before this function (as below).
+    Calculate geometric parameters for boulder or ellipse polygons.
+    
+    Parameters
+    ----------
+    in_shp : str or Path
+        Path to input shapefile containing polygons
+    out_shp_mmr : str or Path
+        Path to output minimum rotated rectangles shapefile
+    out_shp_geomorph : str or Path
+        Path to output geomorphology shapefile
+    crater_centre_point : str or Path or None
+        Path to crater center point shapefile, or None
+    crater_diameter : float or None
+        Crater diameter for normalization, or None
+    is_boulder : bool, optional
+        Whether polygons represent boulders (True) or ellipses (False),
+        by default True
+        
+    Returns
+    -------
+    geopandas.GeoDataFrame
+        DataFrame containing polygons with calculated parameters:
+        - length : longer side of minimum rotated rectangle
+        - width : shorter side of minimum rotated rectangle
+        - long_axis : maximum of length and width
+        - short_axis : minimum of length and width
+        - aspect_ra : aspect ratio (long_axis / short_axis)
+        - angle : rotation angle in [-180, 180] degrees
+        - angle360 : rotation angle in [0, 360] degrees
+        - angle180 : rotation angle in [0, 180] degrees
+        - diameter : average of long and short axes
+        - diametereq : equivalent diameter from area
+        - dist_cc : distance to crater center (if provided)
+        - ndist_cc : normalized distance to crater center (if provided)
+        
+    Notes
+    -----
+    This function should be run after filtering polygons by area:
     areal_threshold = (res * res) * (4.74 * 4.74)
-    __ = filter_by_area(in_shp, areal_threshold, out_shp_filtered, reindex=True)
-    __ = boulder(out_shp_filtered, out_shp_mmr, out_shp_geomorph,
-             None, None, is_boulder=True)
-
-    __ = ellipse(out_shp_filtered, res, out_shp_ellipse)
-    __ = boulder(out_shp_ellipse, out_shp_mmr_ellipse, out_shp_geomorph_ellipse,
-             None, None, is_boulder=False)
-
+    filter_by_area(in_shp, areal_threshold, out_shp_filtered)
     """
     if is_boulder:
         print("Computing the minimum rotated rectangles....")
@@ -134,14 +251,43 @@ def boulder(in_shp, out_shp_mmr, out_shp_geomorph,
     return (gdf_mrr)
 
 
-def density(in_shp, in_graticule, in_graticule_selection, in_raster, min_eq_diameter, block_width, block_height,
-            out_shp, out_raster):
+def density(in_shp, in_graticule, in_graticule_selection, in_raster, min_eq_diameter, 
+           block_width, block_height, out_shp, out_raster):
     """
-    This function depends on the filtering apply to in_shp.
-
-    in_shp: need to have eq.diameter calculated
-    in_graticule : need to be the whole graticule!
-    in_graticule_selection: can be either in_graticule or selection of graticule.
+    Calculate boulder density statistics within a spatial grid.
+    
+    Parameters
+    ----------
+    in_shp : str or Path
+        Path to input shapefile containing boulders with equivalent diameter calculated
+    in_graticule : str or Path
+        Path to complete graticule shapefile
+    in_graticule_selection : str or Path
+        Path to graticule selection shapefile (can be same as in_graticule)
+    in_raster : str or Path
+        Path to input raster for metadata reference
+    min_eq_diameter : float
+        Minimum equivalent diameter threshold for boulder selection
+    block_width : int
+        Width of analysis blocks in pixels
+    block_height : int
+        Height of analysis blocks in pixels
+    out_shp : str or Path
+        Path to output shapefile
+    out_raster : str or Path
+        Path to output raster files (will create count and percentage variants)
+        
+    Returns
+    -------
+    None
+        Outputs are written to files:
+        - count raster: number of boulders per block
+        - percentage raster: percentage area covered by boulders
+        
+    Notes
+    -----
+    Block width must equal block height in current implementation.
+    Input shapefile must have equivalent diameter pre-calculated.
     """
 
     assert block_width == block_height, "block width is different than block_height. This is not supported by the current algorithm."
@@ -205,8 +351,30 @@ def density(in_shp, in_graticule, in_graticule_selection, in_raster, min_eq_diam
     raster.save(out_raster_count, np.expand_dims(array_count, axis=2), out_meta, is_image=True)
     raster.save(out_raster_area, np.expand_dims(array_area, axis=2), out_meta, is_image=True)
 
-def median(in_shp, in_graticule, column, in_meta, out_raster , dtype='uint8'):
-
+def median(in_shp, in_graticule, column, in_meta, out_raster, dtype='uint8'):
+    """
+    Calculate median values of a column within spatial grid cells.
+    
+    Parameters
+    ----------
+    in_shp : str or Path
+        Path to input shapefile
+    in_graticule : str or Path
+        Path to graticule shapefile defining grid cells
+    column : str
+        Name of column to calculate median for
+    in_meta : dict
+        Metadata dictionary containing 'width' and 'length' keys
+    out_raster : str or Path
+        Path to output raster file
+    dtype : str, optional
+        Output data type, by default 'uint8'
+        
+    Returns
+    -------
+    None
+        Results are written to output raster file
+    """
 
     gdf = gpd.read_file(in_shp)
     gdf_graticule = gpd.read_file(in_graticule)
@@ -228,11 +396,32 @@ def median(in_shp, in_graticule, column, in_meta, out_raster , dtype='uint8'):
     print("...calculate median of " + column + "...")
 
 def csfd(in_shp, mask_shp, min_area_threshold, out_shp):
-
-
-
     """
-    area_polygon can be either a single polygon or multiple squares.
+    Calculate Cumulative Size-Frequency Distribution for boulders.
+    
+    Parameters
+    ----------
+    in_shp : str or Path
+        Path to input shapefile containing boulders
+    mask_shp : str or Path
+        Path to mask shapefile defining analysis area
+    min_area_threshold : float
+        Minimum area threshold for filtering intersected polygons
+    out_shp : str or Path
+        Path to output shapefile
+        
+    Returns
+    -------
+    pandas.DataFrame
+        DataFrame containing:
+        - boulder_diameter_eq : equivalent diameter values
+        - density : cumulative number of boulders per area
+        - confidence_interval : confidence interval for density
+        
+    Notes
+    -----
+    Area can be defined by single polygon or multiple squares.
+    Duplicates in geometry are automatically removed.
     """
 
     # reading of files
@@ -256,6 +445,35 @@ def csfd(in_shp, mask_shp, min_area_threshold, out_shp):
     return (pd_csfd)
 
 def csfd_binned(in_shp, mask_shp, min_area_threshold, out_shp, bins_range=False):
+    """
+    Calculate binned Size-Frequency Distribution for boulders.
+    
+    Parameters
+    ----------
+    in_shp : str or Path
+        Path to input shapefile containing boulders
+    mask_shp : str or Path
+        Path to mask shapefile
+    min_area_threshold : float
+        Minimum area threshold for filtering intersected polygons
+    out_shp : str or Path
+        Path to output shapefile
+    bins_range : tuple or False, optional
+        Optional (min, max) range
+        
+    Returns
+    -------
+    pandas.DataFrame
+        DataFrame containing:
+        - boulder_diameter : boulder diameter values
+        - density : cumulative number of boulders per area
+        - confidence_interval : confidence interval for density
+        
+    Notes
+    -----
+    Area can be defined by single polygon or multiple squares.
+    Duplicates in geometry are automatically removed.
+    """
 
     # reading of files
     gdf = shp.intersect(in_shp, mask_shp, min_area_threshold, out_shp)
@@ -288,15 +506,32 @@ def csfd_binned(in_shp, mask_shp, min_area_threshold, out_shp, bins_range=False)
 
 ## This function is very specific, camembert-related function (see camembert function in geometry.py)
 def angle_from_pie(gdf_circle, gdf_oriented_bboxes, threshold_distance):
-    '''
-
-    :return:
-
-    :note:
-    I feel that you have two different ways to approach this problem:
-    - either taking the median within a defined square area (if you have a too
-    small area
-    '''
+    """
+    Calculate median angles of oriented boulders within circular sectors.
+    
+    Parameters
+    ----------
+    gdf_circle : geopandas.GeoDataFrame
+        DataFrame containing circular sector geometries
+    gdf_oriented_bboxes : geopandas.GeoDataFrame
+        DataFrame containing oriented boulder boxes with attributes:
+        - dist_from_cc : distance from center
+        - aspect_ratio : length/width ratio
+        - angle : orientation angle
+    threshold_distance : float
+        Minimum distance from center for boulder selection
+        
+    Returns
+    -------
+    geopandas.GeoDataFrame
+        Input circle DataFrame with added column:
+        - median_angle : median angle of selected boulders
+        
+    Notes
+    -----
+    Only boulders with aspect_ratio > 2.0 and distance > threshold_distance
+    are used for angle calculation.
+    """
     gdf_centroid = gdf_oriented_bboxes.copy()
     gdf_centroid["geometry"] = gdf_oriented_bboxes.geometry.centroid
 

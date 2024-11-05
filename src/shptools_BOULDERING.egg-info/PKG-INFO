@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
-Name: shptools-BOULDERING
-Version: 0.0.4
+Name: shptools_BOULDERING
+Version: 0.0.5
 Summary: Shptools is a package that gathers a collection of tools to manipulate shapefiles.
 Author-email: "Nils C. Prieur" <prieur.nils@gmail.com>
 License: MIT License
